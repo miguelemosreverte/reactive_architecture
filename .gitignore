@@ -1,0 +1,9 @@
+**/.bloop/**
+**/.bsp/**
+/.env
+/.idea
+/.java-version
+/.jvmopts
+/.sbtopts
+**/target/**
+*.sc
