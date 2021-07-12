@@ -1,3 +1,6 @@
+![badge_icon](https://images.credly.com/size/680x680/images/044acea6-eb45-4347-bc66-e81257dbce12/LRA-DistributedMessagingPatterns-badge.png)
+[badge](https://www.credly.com/badges/1ed86ff7-61f6-4845-bc2a-3d2f329d698d/public_url)
+
 # workshop-akka-actors
 
 
