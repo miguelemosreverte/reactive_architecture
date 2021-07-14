@@ -8,7 +8,7 @@ HTTP POST server -> Kafka[1] -> Akka writeside -> Kafka[2]
 Kafka[2] -> Readside that populates DB for query -> HTTP GET sever that hits database  
 Kafka[2] -> Websocket Server that shows in realtime the biddings
 
-![](https://raw.githubusercontent.com/ScalaConsultants/workshop-akka-actors/Lemos/Architecture%20Proposal.svg?token=ACF2PCG2RM4U4RWQHIO3MULA5RPUK)
+![](https://raw.githubusercontent.com/miguelemosreverte/reactive_architecture/main/Architecture%20Proposal.svg)
 
 
 
