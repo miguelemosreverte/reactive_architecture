@@ -1,4 +1,5 @@
 # workshop-akka-actors
+[![](https://jitpack.io/v/miguelemosreverte/reactive_architecture.svg)](https://jitpack.io/#miguelemosreverte/reactive_architecture)
 
 ## TODO WIP
 Make draw.io ofthe proposed architecture
