@@ -1,3 +1,6 @@
+![badge_icon](https://images.credly.com/size/680x680/images/044acea6-eb45-4347-bc66-e81257dbce12/LRA-DistributedMessagingPatterns-badge.png)
+[badge](https://www.credly.com/badges/1ed86ff7-61f6-4845-bc2a-3d2f329d698d/public_url)
+
 # workshop-akka-actors
 
 
@@ -5,7 +8,7 @@ HTTP POST server -> Kafka[1] -> Akka writeside -> Kafka[2]
 Kafka[2] -> Readside that populates DB for query -> HTTP GET sever that hits database  
 Kafka[2] -> Websocket Server that shows in realtime the biddings
 
-![](https://raw.githubusercontent.com/ScalaConsultants/workshop-akka-actors/Lemos/Architecture%20Proposal.svg?token=ACF2PCG2RM4U4RWQHIO3MULA5RPUK)
+![](https://raw.githubusercontent.com/miguelemosreverte/reactive_architecture/main/Architecture%20Proposal.svg)
 
 
 
