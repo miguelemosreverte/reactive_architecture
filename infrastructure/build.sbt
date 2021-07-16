@@ -6,7 +6,7 @@ val AlpakkaKafkaVersion = "2.0.5"
 
 scalaVersion := scalaVer
 
-lazy val `kafka` = project.dependsOn(serialization)
+lazy val `kafka` = project.dependsOn(serialization, actor)
 lazy val `websocket` = project.dependsOn(serialization, actor, http)
 lazy val `kafka_websocket` = project.dependsOn(kafka, websocket)
 lazy val `http_kafka` = project.dependsOn(kafka, http)

@@ -1,5 +1,6 @@
 package io.scalac.auction
 
+object Main /*
 import akka.stream.scaladsl.{Sink, Source}
 import akka.{actor, NotUsed}
 import akka.actor.ActorSystem
@@ -130,7 +131,10 @@ object Main extends App {
 
   println(CreateAuction.serialize(CreateAuction.example))
 
-  ActorTransaction[CreateAuction]("CreateAuction", "CreatedAuction", AuctionActor).run
-  ActorTransaction[CreatedAuction]("CreatedAuction", "CreatedAuctionValidated", LotActor).run
+  import ActorTransactionDTO.Implicits.KafkaTransaction._
+
+  ActorTransactionDTO[CreateAuction](AuctionActor, "CreateAuction", "CreatedAuction").run
+  ActorTransactionDTO[CreatedAuction](LotActor, "CreatedAuction", "CreatedAuctionValidated").run
 
 }
+ */

@@ -10,7 +10,7 @@ lazy val `infrastructure` = project
 
 lazy val `application` = project
   .dependsOn(domain)
-  .dependsOn(infrastructure)
+  .dependsOn(infrastructure % "compile->compile;test->test")
 
 lazy val `serialization` = (project in file(".") / "infrastructure" / "serialization")
 
