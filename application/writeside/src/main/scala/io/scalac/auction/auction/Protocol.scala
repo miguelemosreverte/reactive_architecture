@@ -18,8 +18,8 @@ object Protocol {
   }
 
   object Commands {
-    case class Start(id: AuctionId, replyTo: ActorRef[Response]) extends Command
-    case class End(id: AuctionId, replyTo: ActorRef[Response]) extends Command
+    case class Start(id: AuctionId, replyTo: ActorRef[Response]) extends Command with Protocol
+    case class End(id: AuctionId, replyTo: ActorRef[Response]) extends Command with Protocol
 
     sealed trait `Lot related commands` extends Command
     case class `add lot`(
@@ -27,6 +27,7 @@ object Protocol {
         lot: Lot,
         replyTo: ActorRef[Response]
     ) extends `Lot related commands`
+        with Protocol
     case class `remove lot`(
         id: AuctionId,
         lot: Lot,

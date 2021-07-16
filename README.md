@@ -1,21 +1,24 @@
-![badge_icon](https://images.credly.com/size/680x680/images/044acea6-eb45-4347-bc66-e81257dbce12/LRA-DistributedMessagingPatterns-badge.png)
-[badge](https://www.credly.com/badges/1ed86ff7-61f6-4845-bc2a-3d2f329d698d/public_url)
-
 # workshop-akka-actors
 
+## TODO WIP
+Make draw.io ofthe proposed architecture
 
 HTTP POST server -> Kafka[1] -> Akka writeside -> Kafka[2] 
 Kafka[2] -> Readside that populates DB for query -> HTTP GET sever that hits database  
 Kafka[2] -> Websocket Server that shows in realtime the biddings
 
-![](https://raw.githubusercontent.com/miguelemosreverte/reactive_architecture/main/Architecture%20Proposal.svg)
+![](https://raw.githubusercontent.com/ScalaConsultants/workshop-akka-actors/Lemos/Architecture%20Proposal.svg?token=ACF2PCG2RM4U4RWQHIO3MULA5RPUK)
 
 
+This assignment is meant to help you start with Akka in general and Actors in particular.
 
 ## Objective overview
 
-Build an application that will handle bidding on auction items (called lots). Auctions and Lots will be represented as Actors. In the next steps you will add Akka Persistence to preserve actor's state and Akka HTTP to build an API.
+You will build an application that will handle bidding on auction items (called lots). Auctions and Lots will be represented as Actors. In the next steps you will add Akka Persistence to preserve actor's state and Akka HTTP to build an API.
 
+## Domain Overview
+
+For this application we'll implement only limited set of features that would otherwise be needed for a full-fledged auction app. The focus should be on technology.
 
 ### General rules
 - There can be multiple auctions with multiple items.
@@ -23,6 +26,7 @@ Build an application that will handle bidding on auction items (called lots). Au
 - One lot can be in only one auction.
 - The auction can be started and ended but not restarted.
 - To be able to bid on lots, the auction has to be started.
+- checkout master as your master branch (e.g. jan-kowalski) and branch out from your master branch and merge to it (jan-kowalski -> jan-kowalski-part1 -> jan-kowalski)
 
 ### Bidding
 - The new bid has to be greater than the current bid.
@@ -54,3 +58,16 @@ Implement following endpoints using Akka Http:
 - Bid
 - Get lots by auction
 - Get lot by id
+
+### Additional tasks
+
+- Add authentication using the `Bearer` schema (meaning that the request will include a header of format “Authorization : Bearer <token>” for authentication). Based on the token the application will then look for a user in a hardcoded store. Hint: OAuth2 is using the Bearer tokens and Akka Http supports it with special authentication directives.
+- [requires Akka Streams] Add websocket endpoint for observing current lot price (optional: make it bidirectional with bidding).
+
+## Part 3
+
+Make actors' state persistent using Akka Persistence. You can use any datastore. Hint: the actors should preserve the state between the application restarts, so the real problem to solve here is how to recreate a dynamic actor tree when the application starts.
+
+### Additional tasks
+
+//TODO

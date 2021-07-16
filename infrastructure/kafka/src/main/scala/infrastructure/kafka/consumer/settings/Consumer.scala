@@ -12,7 +12,8 @@ object Consumer {
     ConsumerSettings
       .create(requirements.actorSystem, new StringDeserializer, new StringDeserializer)
       .withBootstrapServers(requirements.kafkaBootstrapServer.url)
-      .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
+      .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
+                    if (requirements.startFromZero) "earliest" else "auto.offset.reset")
       .withStopTimeout(Duration.ofSeconds(5))
 
 }

@@ -27,16 +27,14 @@ object Main extends App {
 
   implicit val b = domain.Bid
 
-  println(domain.Bid serialize (b.example, multiline = false))
-
   import akka.http.scaladsl.server.Directives._
   val routes: Flow[HttpRequest, HttpResponse, NotUsed] = {
     get {
       path("ws" / "room" / Segment) { topic =>
         KafkaWebsocket
           .apply[domain.Bid](
-            ffromKafka = domain.Bid.kafka.consumer.plain.source("bid", "websocket_endpoint_" + Random.nextString(10)),
-            ttoKafka = domain.Bid.kafka.producer.plain.sink("bid")
+            ffromKafka = domain.Bid.kafka.consumer.plain.source(topic, "websocket_endpoint_" + Random.nextString(10)),
+            ttoKafka = domain.Bid.kafka.producer.plain.sink(topic)
           )
           .route
       }

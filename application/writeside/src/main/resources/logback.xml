@@ -20,8 +20,8 @@
         <appender-ref ref="FILE" />
     </appender>
 
-    <root level="INFO">
-        <appender-ref ref="ASYNC"/>
+    <root level="ERROR">
+        <appender-ref ref="STDOUT"/>
     </root>
 
 </configuration>

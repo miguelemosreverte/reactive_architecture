@@ -1,28 +1,82 @@
+import akka.actor.ActorSystem
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpecLike
+import org.scalatest.wordspec.{AnyWordSpecLike, AsyncWordSpec}
 import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import akka.actor.typed.ActorRef
+import akka.cluster.sharding.typed.ShardingEnvelope
+import akka.cluster.sharding.typed.scaladsl.ClusterSharding
+import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 import io.scalac.auction.lot.Domain.{Bid, Lot, LotId, User, UserId}
 import io.scalac.auction.auction.actor.{Actor => AuctionActor}
+import io.scalac.auction.lot.actor.{Actor => LotActor}
 import io.scalac.auction.auction.Domain.{Auction, AuctionId}
 import io.scalac.auction.auction.{Protocol => AuctionProtocol}
 import io.scalac.auction.lot.{Protocol => LotProtocol}
+import scala.concurrent.duration.DurationInt
 
-import java.util.UUID
+class AuctionActorSpec extends AsyncWordSpec with Matchers {
+  import akka.actor.typed.scaladsl.adapter._
 
-class AuctionActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with Matchers {
+  implicit lazy val system = ActorSystem(
+    "auctionspec",
+    ConfigFactory.parseString("""
+      |
+      |akka {
+      |  actor {
+      |    provider = cluster
+      |    debug {
+      |      receive = on
+      |    }
+      |  }
+      |
+      |  remote {
+      |    artery {
+      |      transport = tcp # See Selecting a transport below
+      |      canonical.hostname = "0.0.0.0"
+      |      canonical.port = 2552
+      |    }
+      |  }
+      |
+      |  cluster {
+      |    seed-nodes = ["akka://auctionspec@0.0.0.0:2552"]
+      |  }
+      |
+      |  extensions = ["akka.cluster.pubsub.DistributedPubSub"]
+      |
+      |
+      |}
+      |""".stripMargin)
+  ).toTyped
 
   val exLot1 = Lot(LotId("a"))
   val exLot2 = Lot(LotId("b"))
 
+  implicit lazy val sharding = ClusterSharding.apply(system)
+
+  implicit val lot: ActorRef[ShardingEnvelope[io.scalac.auction.lot.Protocol.Command]] =
+    new LotActor().sharded
+
+  val auction: ActorRef[ShardingEnvelope[io.scalac.auction.auction.Protocol.Command]] =
+    new AuctionActor().sharded
+
+  import akka.actor.typed.scaladsl.AskPattern._
+  implicit val ec = system.classicSystem.dispatcher
+  implicit val timeout: Timeout = 20.seconds
+
   "AuctionActor" should {
-    val auction = testKit.spawn(AuctionActor(Auction(AuctionId("1"), Set(exLot1, exLot2))), "auction-0")
-    val probe = testKit.createTestProbe[AuctionProtocol.Response]()
+
     val user0 = User(UserId("user-0"))
     val user1 = User(UserId("user-1"))
     "add lot" in {
-      auction ! AuctionProtocol.Commands.`add lot`(AuctionId("1"), exLot1, probe.ref)
-      probe.expectMessage(AuctionProtocol.Responses.Successes.`added lot`)
+      for {
+        response <- auction ask (
+            (ref: ActorRef[AuctionProtocol.Response]) =>
+              ShardingEnvelope.apply("1", AuctionProtocol.Commands.`add lot`(AuctionId("1"), exLot1, ref))
+          )
+        _ = println(response)
+      } yield response should be(AuctionProtocol.Responses.Successes.`added lot`)
     } /*
     "list single lot" in {
       auction ! AuctionActor.List(probe.ref)
@@ -44,29 +98,57 @@ class AuctionActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike wi
     }
      */
     "start" in {
-      auction ! AuctionProtocol.Commands.Start(AuctionId("1"), probe.ref)
-      probe.expectMessage(AuctionProtocol.Responses.Successes.Started(AuctionId("1")))
+      for {
+        response <- auction ask (
+            (ref: ActorRef[AuctionProtocol.Response]) =>
+              ShardingEnvelope.apply("1", AuctionProtocol.Commands.Start(AuctionId("1"), ref))
+          )
+        _ = println(response)
+      } yield response should be(AuctionProtocol.Responses.Successes.Started(AuctionId("1")))
     }
     "not restart" in {
-      auction ! AuctionProtocol.Commands.Start(AuctionId("1"), probe.ref)
-      probe.expectMessage(AuctionProtocol.Responses.Failures.`cannot start auction again`)
+      for {
+        response <- auction ask (
+            (ref: ActorRef[AuctionProtocol.Response]) =>
+              ShardingEnvelope.apply("1", AuctionProtocol.Commands.Start(AuctionId("1"), ref))
+          )
+        _ = println(response)
+      } yield response should be(AuctionProtocol.Responses.Failures.`cannot start auction again`)
     }
     "try a bid" in {
-      val bidder = testKit.createTestProbe[LotProtocol.Response]()
-      auction ! AuctionProtocol.Commands.`bid lot`(AuctionId("1"), Bid(user0, exLot1, 5), bidder.ref)
-      bidder.expectMessage(LotProtocol.Responses.Successes.BidSuccessful(5, true))
+      for {
+        response <- auction ask (
+            (ref: ActorRef[LotProtocol.Response]) =>
+              ShardingEnvelope.apply("1",
+                                     AuctionProtocol.Commands.`bid lot`(AuctionId("1"), Bid(user0, exLot1, 5), ref))
+          )
+        _ = println(response)
+      } yield response should be(LotProtocol.Responses.Successes.BidSuccessful(5, true))
     }
     "try an invalid bid" in {
-      val bidder = testKit.createTestProbe[LotProtocol.Response]()
-      auction ! AuctionProtocol.Commands
-        .`bid lot`(AuctionId("1"), Bid(user0, exLot1, -5), bidder.ref)
-      bidder.expectMessage(LotProtocol.Responses.Failures.`bid must be positive`)
+
+      for {
+        response <- auction ask (
+            (ref: ActorRef[LotProtocol.Response]) =>
+              ShardingEnvelope.apply("1",
+                                     AuctionProtocol.Commands
+                                       .`bid lot`(AuctionId("1"), Bid(user0, exLot1, -5), ref))
+          )
+        _ = println(response)
+      } yield response should be(LotProtocol.Responses.Failures.`bid must be positive`)
+
     }
     "try a higher bid" in {
-      val bidder = testKit.createTestProbe[LotProtocol.Response]()
-      auction ! AuctionProtocol.Commands
-        .`bid lot`(AuctionId("1"), Bid(user1, exLot1, 10), bidder.ref)
-      bidder.expectMessage(LotProtocol.Responses.Successes.BidSuccessful(10, true))
+      for {
+        response <- auction ask (
+            (ref: ActorRef[LotProtocol.Response]) =>
+              ShardingEnvelope.apply("1",
+                                     AuctionProtocol.Commands
+                                       .`bid lot`(AuctionId("1"), Bid(user1, exLot1, 10), ref))
+          )
+        _ = println(response)
+      } yield response should be(LotProtocol.Responses.Successes.BidSuccessful(10, true))
+
     } /*
     "bid lower than the max of others" in {
       val bidder = testKit.createTestProbe[LotActor.BidResult]()
@@ -75,9 +157,13 @@ class AuctionActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike wi
     }*/
 
     "end" in {
-      auction ! AuctionProtocol.Commands.End(AuctionId("1"), probe.ref)
-      probe.expectMessage(AuctionProtocol.Responses.Successes.Ended(AuctionId("1")))
-      testKit.stop(auction)
+      for {
+        response <- auction ask (
+            (ref: ActorRef[AuctionProtocol.Response]) =>
+              ShardingEnvelope.apply("1", AuctionProtocol.Commands.End(AuctionId("1"), ref))
+          )
+        _ = println(response)
+      } yield response should be(AuctionProtocol.Responses.Successes.Ended(AuctionId("1")))
     }
   }
 }

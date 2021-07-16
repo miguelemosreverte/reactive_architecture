@@ -30,7 +30,8 @@ object KafkaSupport {
     case class KafkaRequirements(
         kafkaBootstrapServer: KafkaBootstrapServer,
         actorSystem: ActorSystem,
-        logger: Logger
+        logger: Logger,
+        startFromZero: Boolean = true
     )
     case class KafkaBootstrapServer(url: String)
 

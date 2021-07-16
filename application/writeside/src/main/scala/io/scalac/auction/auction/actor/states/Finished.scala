@@ -1,8 +1,8 @@
 package io.scalac.auction.auction.actor.states
 
-import akka.actor.typed.Behavior
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.Behaviors
-import io.scalac.auction.lot.actor.router.Router.`Lot Router`
+import akka.cluster.sharding.typed.ShardingEnvelope
 import io.scalac.auction.auction.Domain.Auction
 import io.scalac.auction.auction.Protocol.{Command, Commands}
 import io.scalac.auction.auction.Protocol.Responses.Failures
@@ -11,7 +11,9 @@ object Finished {
 
   def apply(
       auction: Auction
-  )(implicit lots: `Lot Router`): Behavior[Command] =
+  )(
+      implicit lotActor: ActorRef[ShardingEnvelope[io.scalac.auction.lot.Protocol.Command]]
+  ): Behavior[Command] =
     Behaviors.receiveMessage {
 
       case Commands.Start(id, replyTo) =>

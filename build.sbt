@@ -4,7 +4,7 @@ lazy val root = project
     name := "akka-auction-workshop",
     version := "0.1.0",
     scalaVersion := "2.13.6"
-  ).aggregate(infrastructure, domain, application)
+  )
 
 lazy val `infrastructure` = project
 

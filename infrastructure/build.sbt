@@ -12,6 +12,7 @@ lazy val `kafka_websocket` = project.dependsOn(kafka, websocket)
 lazy val `http_kafka` = project.dependsOn(kafka, http)
 lazy val `http` = project.dependsOn(actor)
 lazy val `actor` = project
+lazy val `database` = project
 
 lazy val `serialization` = project
 

@@ -16,6 +16,7 @@ libraryDependencies += ("com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion)
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.8" % Test
 libraryDependencies += ("ch.qos.logback" % "logback-classic" % "1.2.3")
 libraryDependencies += ("com.typesafe.akka" %% "akka-stream-kafka" % AlpakkaKafkaVersion)
+libraryDependencies += "com.typesafe.akka" %% "akka-cluster-sharding-typed" % "2.6.15"
 
 enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)

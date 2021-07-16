@@ -11,12 +11,14 @@ import infrastructure.kafka.consumer.logger.Protocol
 import infrastructure.kafka.consumer.logger.Protocol._
 import org.apache.kafka.clients.producer.ProducerRecord
 import infrastructure.kafka.KafkaSupport.Protocol._
-import scala.concurrent.Future
 
-class TransactionalSource[A]()(implicit requirements: KafkaRequirements, deserializer: Deserializer[A]) {
+import scala.concurrent.{ExecutionContext, Future}
+
+class TransactionalSource[Command]()(implicit requirements: KafkaRequirements, deserializer: Deserializer[Command]) {
   private implicit val actorSystem = requirements.actorSystem
 
-  def run(topic: String, group: String)(callback: A => Either[String, Unit]): (UniqueKillSwitch, Future[Done]) = {
+  def run(topic: String,
+          group: String)(callback: Command => Future[Either[String, Unit]]): (UniqueKillSwitch, Future[Done]) = {
 
     val `topic to commit in case of errors` = s"${topic}_transactional_error"
     val `topic to commit in case of deserialization error` = s"${topic}_transactional_deserialization_error"
@@ -42,26 +44,30 @@ class TransactionalSource[A]()(implicit requirements: KafkaRequirements, deseria
           msg.record.key,
           msg.record.value
         ),
-        msg.partitionOffset
+        passThrough = msg.partitionOffset
       )
     }
 
+    implicit val ec: ExecutionContext = actorSystem.dispatcher
     source
-      .map { (msg: ConsumerMessage.TransactionalMessage[String, String]) =>
-        val output = deserializer
-          .deserialize(msg.record.value) match {
-          case Left(_) =>
-            Protocol.`Failed to deserialize`(topic, msg.record.value)
-          case Right(value) =>
-            callback(value) match {
-              case Left(_) =>
-                Protocol.`Failed to process`(topic, msg.record.value)
-              case Right(_) =>
-                Protocol.`Processed`(topic, msg.record.value)
-            }
-        }
-        log(output)
-        commit(msg)(output)
+      .mapAsync(1) { (msg: ConsumerMessage.TransactionalMessage[String, String]) =>
+        for {
+          output <- deserializer
+            .deserialize(msg.record.value) match {
+            case Left(_) =>
+              Future.successful(Protocol.`Failed to deserialize`(topic, msg.record.value))
+            case Right(value) =>
+              callback(value) map {
+                case Left(_) =>
+                  Protocol.`Failed to process`(topic, msg.record.value)
+                case Right(_) =>
+                  Protocol.`Processed`(topic, msg.record.value)
+              }
+          }
+        } yield {
+          log(output)
+          commit(msg)(output)
+        } // TODO add Future recover that does not commit
       }
       .via(Transactional.flow(infrastructure.kafka.producer.settings.Producer.apply, "transactionalId"))
       .toMat(Sink.ignore)(Keep.both)

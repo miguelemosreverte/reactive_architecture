@@ -1,9 +1,8 @@
 package io.scalac.auction.auction.actor.states
 
-import akka.actor.typed.Behavior
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.Behaviors
-import io.scalac.auction.lot.actor.router.Router
-import io.scalac.auction.lot.actor.router.Router.`Lot Router`
+import akka.cluster.sharding.typed.ShardingEnvelope
 import io.scalac.auction.auction.Domain.Auction
 import io.scalac.auction.auction.Protocol.{Command, Commands}
 import io.scalac.auction.auction.Protocol.Responses.{Failures, Successes}
@@ -11,9 +10,10 @@ import io.scalac.auction.auction.Protocol.Responses.{Failures, Successes}
 object InProgress {
   def apply(
       auction: Auction
+  )(
+      implicit lotActor: ActorRef[ShardingEnvelope[io.scalac.auction.lot.Protocol.Command]]
   ): Behavior[Command] =
     Behaviors.receive[Command] { (ctx, message) =>
-      implicit val lots: `Lot Router` = Router(auction.lots)(ctx)
       message match {
 
         case Commands.Start(id, replyTo) =>
@@ -25,7 +25,7 @@ object InProgress {
           Finished(auction)
 
         case Commands.`bid lot`(auctionId, bid, replyTo) =>
-          lots ! io.scalac.auction.lot.Protocol.Commands.Bid(bid, replyTo)
+          lotActor ! ShardingEnvelope(bid.lot.id.id, io.scalac.auction.lot.Protocol.Commands.Bid(bid, replyTo))
           Behaviors.same
 
       }
