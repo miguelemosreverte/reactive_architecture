@@ -21,6 +21,10 @@ name := "infrastructure"
 lazy val infrastructure = project
   .in(file("."))
   .aggregate(
+    actor,
+    http,
+    websocket,
+    kafka_websocket,
     `kafka`,
     `serialization`
   )
