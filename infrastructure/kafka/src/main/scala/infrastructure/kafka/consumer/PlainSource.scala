@@ -9,12 +9,15 @@ import infrastructure.serialization.algebra.Deserializer
 import infrastructure.kafka.consumer.logger.Protocol
 import infrastructure.kafka.KafkaSupport.Protocol._
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class PlainSource[A]()(implicit requirements: KafkaRequirements, deserializer: Deserializer[A]) {
+class PlainSource[A]()(implicit requirements: KafkaRequirements, deserializer: Deserializer[A])
+    extends infrastructure.kafka.consumer.Source {
   private implicit val actorSystem = requirements.actorSystem
+  private implicit val ec: ExecutionContext = actorSystem.dispatcher
 
-  def run(topic: String, group: String)(callback: A => Either[String, Unit]): (UniqueKillSwitch, Future[Done]) = {
+  def run(topic: String,
+          group: String)(callback: A => Future[Either[String, Unit]]): (UniqueKillSwitch, Future[Done]) = {
     val source = Consumer
       .plainSource(settings.Consumer.apply.withGroupId(group), Subscriptions.topics(topic))
       .viaMat(KillSwitches.single)(Keep.right)
@@ -23,17 +26,13 @@ class PlainSource[A]()(implicit requirements: KafkaRequirements, deserializer: D
     def log: Protocol => Unit = requirements.logger.log
 
     source
-      .map { msg =>
-        val output = deserializer.deserialize(msg) match {
-          case Left(_) => Protocol.`Failed to deserialize`(topic, msg)
-          case Right(value) =>
-            callback(value) match {
-              case Left(_) => Protocol.`Failed to process`(topic, msg)
-              case Right(_) => Protocol.`Processed`(topic, msg)
-            }
+      .mapAsync(1) { msg =>
+        for {
+          output <- process(callback)(topic, msg)
+        } yield {
+          log(output)
+          output
         }
-        log(output)
-        output
       }
       .toMat(Sink.ignore)(Keep.both)
       .run()

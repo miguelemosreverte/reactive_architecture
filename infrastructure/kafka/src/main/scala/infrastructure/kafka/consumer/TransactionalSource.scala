@@ -14,8 +14,10 @@ import infrastructure.kafka.KafkaSupport.Protocol._
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TransactionalSource[Command]()(implicit requirements: KafkaRequirements, deserializer: Deserializer[Command]) {
+class TransactionalSource[Command]()(implicit requirements: KafkaRequirements, deserializer: Deserializer[Command])
+    extends infrastructure.kafka.consumer.Source {
   private implicit val actorSystem = requirements.actorSystem
+  private implicit val ec: ExecutionContext = actorSystem.dispatcher
 
   def run(topic: String,
           group: String)(callback: Command => Future[Either[String, Unit]]): (UniqueKillSwitch, Future[Done]) = {
@@ -48,22 +50,10 @@ class TransactionalSource[Command]()(implicit requirements: KafkaRequirements, d
       )
     }
 
-    implicit val ec: ExecutionContext = actorSystem.dispatcher
     source
       .mapAsync(1) { (msg: ConsumerMessage.TransactionalMessage[String, String]) =>
         for {
-          output <- deserializer
-            .deserialize(msg.record.value) match {
-            case Left(_) =>
-              Future.successful(Protocol.`Failed to deserialize`(topic, msg.record.value))
-            case Right(value) =>
-              callback(value) map {
-                case Left(_) =>
-                  Protocol.`Failed to process`(topic, msg.record.value)
-                case Right(_) =>
-                  Protocol.`Processed`(topic, msg.record.value)
-              }
-          }
+          output <- process(callback)(topic, msg.record.value)
         } yield {
           log(output)
           commit(msg)(output)

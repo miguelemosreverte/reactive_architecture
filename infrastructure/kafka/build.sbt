@@ -12,6 +12,8 @@ val AlpakkaKafkaVersion = "2.1.0"
 
 scalaVersion := scalaVer
 
+libraryDependencies += ("infrastructure" %% "monitoring" % "1.0.0")
+
 libraryDependencies += ("com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion)
 libraryDependencies += ("infrastructure" %% "actor" % "1.0.0")
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.8" % Test

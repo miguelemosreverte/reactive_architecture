@@ -15,10 +15,13 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import infrastructure.kafka.KafkaSupport.Protocol._
 import scala.concurrent.Future
 
-class CommitableSource[A]()(implicit requirements: KafkaRequirements, deserializer: Deserializer[A]) {
+class CommitableSource[A]()(implicit requirements: KafkaRequirements, deserializer: Deserializer[A])
+    extends infrastructure.kafka.consumer.Source {
   private implicit val actorSystem = requirements.actorSystem
+  private implicit val executionContext = actorSystem.dispatcher
 
-  def run(topic: String, group: String)(callback: A => Either[String, Unit]): (UniqueKillSwitch, Future[Done]) = {
+  def run(topic: String,
+          group: String)(callback: A => Future[Either[String, Unit]]): (UniqueKillSwitch, Future[Done]) = {
 
     val `topic to commit in case of success` = s"${topic}_transactional_success"
 
@@ -47,20 +50,13 @@ class CommitableSource[A]()(implicit requirements: KafkaRequirements, deserializ
     Consumer
       .committableSource(settings.Consumer.apply.withGroupId(group), Subscriptions.topics(topic))
       .viaMat(KillSwitches.single)(Keep.right)
-      .map((msg: ConsumerMessage.CommittableMessage[String, String]) => {
-        val output = deserializer.deserialize(msg.record.value) match {
-          case Left(value) =>
-            Protocol.`Failed to deserialize`(topic, msg.record.value)
-          case Right(value) =>
-            callback(value) match {
-              case Left(_) =>
-                Protocol.`Failed to deserialize`(topic, msg.record.value)
-              case Right(_) =>
-                Protocol.`Processed`(topic, msg.record.value)
-            }
+      .mapAsync(1)((msg: ConsumerMessage.CommittableMessage[String, String]) => {
+        for {
+          output <- process(callback)(topic, msg.record.value)
+        } yield {
+          log(output)
+          commit(msg)(output)
         }
-        log(output)
-        commit(msg)(output)
       })
       .via(Producer.flexiFlow(infrastructure.kafka.producer.settings.Producer.apply))
       .map(_.passThrough)

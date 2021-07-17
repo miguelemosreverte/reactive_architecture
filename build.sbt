@@ -4,7 +4,8 @@ lazy val root = project
     name := "akka-auction-workshop",
     version := "0.1.0",
     scalaVersion := "2.13.6"
-  ).aggregate(infrastructure)
+  )
+  .aggregate(domain, infrastructure)
 
 lazy val `infrastructure` = project
 
@@ -16,8 +17,7 @@ lazy val `serialization` = (project in file(".") / "infrastructure" / "serializa
 
 lazy val `domain` = project
   .dependsOn(serialization)
-  
-  
+
 publishArtifact in GlobalScope in Test := true
 
 // enable publishing the jar produced by `test:package`
