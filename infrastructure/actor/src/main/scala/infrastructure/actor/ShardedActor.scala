@@ -12,14 +12,14 @@ import scala.concurrent.duration.DurationInt
 import scala.language.postfixOps
 import scala.reflect.ClassTag
 
-abstract class ShardedActor[Command <: Aggregate: ClassTag]()(
+abstract class ShardedActor[Command <: Aggregate: ClassTag, State]()(
     implicit
     sharding: ClusterSharding,
     system: ActorSystem[Nothing],
     timeout: Timeout = Timeout(20 seconds)
 ) {
   type `Command to Event` = Behavior[Message[Command, Command#Response]]
-  protected def behavior(id: String): `Command to Event`
+  protected def behavior(id: String)(state: Option[State] = None): `Command to Event`
 
   private final type M = Message[Command, Command#Response]
   private final def init(
@@ -30,7 +30,7 @@ abstract class ShardedActor[Command <: Aggregate: ClassTag]()(
   ): ActorRef[ShardingEnvelope[M]] = {
     val entityTypeKey: EntityTypeKey[M] = EntityTypeKey.apply[M](implicitly[ClassTag[Command]].runtimeClass.getTypeName)
     val entityRef: ActorRef[ShardingEnvelope[M]] = sharding.init(Entity(entityTypeKey)(createBehavior = { context =>
-      behavior(context.entityId)
+      behavior(context.entityId)(None)
     }))
     entityRef
   }
