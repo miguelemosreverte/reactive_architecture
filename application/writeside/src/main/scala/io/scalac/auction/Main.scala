@@ -1,6 +1,5 @@
 package io.scalac.auction
 
-object Main /*
 import akka.stream.scaladsl.{Sink, Source}
 import akka.{actor, NotUsed}
 import akka.actor.ActorSystem
@@ -29,7 +28,7 @@ import play.api.libs.json.{Format, Json}
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-object Main extends App {
+object Main /*extends App {
 
   implicit lazy val system: ActorSystem = ActorSystem(
     "auctionspec",

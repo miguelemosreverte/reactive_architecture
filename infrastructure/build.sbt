@@ -7,22 +7,18 @@ val AlpakkaKafkaVersion = "2.0.5"
 scalaVersion := scalaVer
 
 lazy val `monitoring` = project
-  .settings(
-    scalaVersion := "2.13.6"
-  )
-lazy val `kafka` = project
-  .settings(
-    scalaVersion := "2.13.6"
-  )
-  .dependsOn(serialization, actor, monitoring)
+lazy val `kafka` = project.dependsOn(serialization, actor, monitoring)
 lazy val `websocket` = project.dependsOn(serialization, actor, kafka, http, monitoring)
 lazy val `kafka_websocket` = project.dependsOn(kafka, websocket, monitoring)
 lazy val `http_kafka` = project.dependsOn(kafka, http, monitoring)
-lazy val `http` = project.dependsOn(actor, monitoring)
+lazy val `http` = project.dependsOn(serialization, actor, monitoring)
 lazy val `actor` = project.dependsOn(monitoring)
 lazy val `database` = project
-
+lazy val `grafana` = project.dependsOn(http)
+lazy val `tracing` = project.dependsOn(kafka, transaction, grafana, actor)
+lazy val `transaction` = project.dependsOn(kafka, actor, http, grafana)
 lazy val `serialization` = project
+lazy val `microservice` = project.dependsOn(serialization, http, actor, kafka, tracing, monitoring, transaction)
 
 name := "infrastructure"
 
@@ -36,7 +32,11 @@ lazy val infrastructure = project
     `http_kafka`,
     `kafka`,
     `serialization`,
-    `monitoring`
+    `monitoring`,
+    tracing,
+    grafana,
+    `transaction`,
+    microservice
   )
 
 publishArtifact in GlobalScope in Test := true

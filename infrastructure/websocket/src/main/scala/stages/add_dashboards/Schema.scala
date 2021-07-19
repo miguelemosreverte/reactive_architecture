@@ -11,8 +11,6 @@ case class CreateDashboard(
     dashboard: Implicits.`Dashboard` = Implicits.`Dashboard`.example
 ) {
 
-  def asJson: String = Implicits.CreateDashboard serialize this
-
   def overwrite(yesNo: Boolean) =
     copy(overwrite = yesNo)
 
@@ -115,27 +113,9 @@ object Implicits {
     val example = `Panel xAxis`()
     override val json = Json.format
   }
-  case class `Panel yAxes`(
-      format: String = "ms",
-      label: Option[String] = None,
-      logBase: Int = 1,
-      max: Option[String] = None,
-      min: Option[String] = None,
-      show: Boolean = true
-  )
-
+  case class `Panel yAxes`(format: String = "short")
   implicit object `Panel yAxes` extends `JSON Serialization`[`Panel yAxes`] {
-    val milliseconds = `Panel yAxes`("ms")
-    val short = `Panel yAxes`("short")
-    val example = milliseconds
-    sealed trait PanelType
-    case object Time extends PanelType
-    case object Unit extends PanelType
-    def apply(panelType: PanelType): Seq[`Panel yAxes`] =
-      panelType match {
-        case Time => Seq(milliseconds, milliseconds copy (show = false))
-        case Unit => Seq(short, short.copy(show = false))
-      }
+    val example = `Panel yAxes`()
     override val json = Json.format
   }
   case class `Panel yAxis`(align: Boolean = false)
@@ -156,7 +136,7 @@ object Implicits {
       title: String = "Panel Title Left",
       `type`: String = "graph",
       xAxis: `Panel xAxis` = `Panel xAxis`.example,
-      yaxes: Seq[`Panel yAxes`] = Seq(`Panel yAxes`.example, `Panel yAxes`.example),
+      yAxes: Seq[`Panel yAxes`] = Seq(`Panel yAxes`.example, `Panel yAxes`.example),
       yAxis: `Panel yAxis` = `Panel yAxis`.example
   )
 

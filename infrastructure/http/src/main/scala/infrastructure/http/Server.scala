@@ -3,7 +3,9 @@ package infrastructure.http
 import akka.actor.ActorSystem
 import akka.dispatch.MessageDispatcher
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.server.Directives.{complete, get, path}
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Flow
 import com.typesafe.config.{Config, ConfigFactory}
@@ -13,6 +15,9 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, DurationInt, SECONDS}
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
+import akka.http.scaladsl.server.Directives.{get, path, _}
+import infrastructure.serialization.interpreter.`JSON Serialization`
+import play.api.libs.json.{Format, Json}
 
 object Server {
 
@@ -90,4 +95,70 @@ object Server {
       actorSystem: ActorSystem
   ): Unit =
     Server(route, akkaHttpServerConfig.interface, akkaHttpServerConfig.port)
+}
+
+trait Server {
+  val interface: String = "0.0.0.0"
+  val port: Int = 8080
+  val explanation: String
+  val preffix: String
+  protected def selfPath = s"$interface:$port/$preffix"
+  def usefulUrls: Seq[String] = Seq(
+    s"$selfPath/examples"
+  )
+
+  sealed trait Example
+  case class `GET Example`(path: String, exampleOutput: String) extends Example
+  object `GET Example` extends `JSON Serialization`[`GET Example`] {
+    val example = `GET Example`("/", "OK")
+    val json: Format[`GET Example`] = Json.format
+  }
+  case class `POST Example`(path: String, exampleInput: String, exampleOutput: String) extends Example
+  object `POST Example` extends `JSON Serialization`[`POST Example`] {
+    val example = `POST Example`("/", "", "OK")
+    val json: Format[`POST Example`] = Json.format
+  }
+  object Example
+
+  def examples: Seq[Example] = Seq.empty
+
+  def routes: Route = {
+    Seq(
+      get {
+        path("health") {
+          complete {
+            HttpResponse(OK, entity = "OK")
+          }
+        }
+      },
+      get {
+        path("") {
+          complete {
+
+            s"""
+               |
+               | ${explanation}
+               |
+               | ${usefulUrls}
+               |
+               |""".stripMargin
+          }
+        }
+      },
+      get {
+        path("examples") {
+          complete {
+
+            examples map {
+              case example: `GET Example` =>
+                `GET Example` serialize example
+              case example: `POST Example` =>
+                `POST Example` serialize example
+            } mkString ("\n")
+
+          }
+        }
+      }
+    ).reduce(_ ~ _)
+  }
 }

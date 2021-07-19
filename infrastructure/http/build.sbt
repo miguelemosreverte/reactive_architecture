@@ -13,7 +13,6 @@ val AlpakkaKafkaVersion = "2.0.5"
 scalaVersion := scalaVer
 libraryDependencies ++= List(
   // #deps
-  "infrastructure" %% "serialization" % "1.0.0",
   "com.typesafe.akka" %% "akka-actor" % AkkaVersion,
   "com.typesafe.akka" %% "akka-stream" % AkkaVersion,
   "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion

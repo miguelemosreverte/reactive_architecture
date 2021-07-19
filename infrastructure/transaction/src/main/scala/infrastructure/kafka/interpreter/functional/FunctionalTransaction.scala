@@ -1,22 +1,22 @@
 package infrastructure.kafka.interpreter.functional
 
 import akka.stream.{QueueCompletionResult, QueueOfferResult}
-import infrastructure.actor.ShardedActor._
 import infrastructure.kafka.algebra.{KafkaTransaction, MessageProcessor, MessageProducer}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.reflect.ClassTag
 
-case class FunctionalTransaction[Command <: Aggregate](
+case class FunctionalTransaction[Domain, Response](
     from: String,
     to: String,
-    transaction: Command => Future[Command#Response],
-    fromKafka: MessageProcessor[Command],
-    toKafka: MessageProducer[Command]
+    transaction: Domain => Future[Response],
+    fromKafka: MessageProcessor[Domain],
+    toKafka: MessageProducer[Response]
 ) extends KafkaTransaction {
   def run(implicit ec: ExecutionContext) = {
-    fromKafka.run(from, to) { command =>
+    fromKafka.run(from, to) { domain =>
       for {
-        snapshot <- transaction(command)
+        snapshot <- transaction(domain)
         published <- toKafka.producer(to) offer snapshot
       } yield {
         published match {
@@ -30,10 +30,10 @@ case class FunctionalTransaction[Command <: Aggregate](
 }
 
 object FunctionalTransaction {
-  def apply[Command <: Aggregate](transaction: Command => Future[Command#Response], from: String, to: String)(
+  def apply[Domain, Response](transaction: Domain => Future[Response], from: String, to: String)(
       implicit
-      fromKafka: MessageProcessor[Command],
-      toKafka: MessageProducer[Command]
-  ): FunctionalTransaction[Command] =
+      fromKafka: MessageProcessor[Domain],
+      toKafka: MessageProducer[Response]
+  ): FunctionalTransaction[Domain, Response] =
     FunctionalTransaction(from, to, transaction, fromKafka, toKafka)
 }

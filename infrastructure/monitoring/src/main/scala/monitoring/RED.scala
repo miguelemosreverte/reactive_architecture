@@ -9,7 +9,7 @@ object RED {
   ): Unit =
     monitoring.counter(s"$name-request").increment()
 
-  final def recordErrors(name: String, explanation: String)(
+  final def recordErrors(name: String)(
       implicit
       monitoring: Monitoring
   ): Unit =

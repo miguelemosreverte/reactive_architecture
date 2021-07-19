@@ -1,56 +1,43 @@
 package infrastructure.actor
 
-import akka.actor.typed.scaladsl.AskPattern.{Askable, _}
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.cluster.sharding.typed.ShardingEnvelope
-import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityTypeKey}
-import akka.util.Timeout
-import infrastructure.actor.ShardedActor._
-
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import akka.cluster.sharding.typed.scaladsl._
 import scala.language.postfixOps
 import scala.reflect.ClassTag
+import akka.util.Timeout
+import akka.actor.typed._
 
-abstract class ShardedActor[Command <: Aggregate: ClassTag, State]()(
+abstract class ShardedActor[Command: ClassTag, State]()(
     implicit
     sharding: ClusterSharding,
     system: ActorSystem[Nothing],
     timeout: Timeout = Timeout(20 seconds)
 ) {
-  type `Command to Event` = Behavior[Message[Command, Command#Response]]
-  protected def behavior(id: String)(state: Option[State] = None): `Command to Event`
 
-  private final type M = Message[Command, Command#Response]
+  protected def behavior(id: String)(state: Option[State] = None): Behavior[Command]
+
+  type C = Command
+  type M = ShardingEnvelope[C]
   private final def init(
       implicit
       sharding: ClusterSharding,
       system: ActorSystem[Nothing],
       timeout: Timeout = Timeout(20 seconds)
-  ): ActorRef[ShardingEnvelope[M]] = {
-    val entityTypeKey: EntityTypeKey[M] = EntityTypeKey.apply[M](implicitly[ClassTag[Command]].runtimeClass.getTypeName)
-    val entityRef: ActorRef[ShardingEnvelope[M]] = sharding.init(Entity(entityTypeKey)(createBehavior = { context =>
-      behavior(context.entityId)(None)
+  ): ActorRef[M] = {
+    val entityTypeKey: EntityTypeKey[C] =
+      EntityTypeKey.apply[Command](implicitly[ClassTag[Command]].runtimeClass.getTypeName)
+    val entityRef: ActorRef[M] = sharding.init(Entity(entityTypeKey)(createBehavior = { context =>
+      behavior(context.entityId)(None) /*.transformMessages[M]({
+        case ShardingEnvelope(entityId, message) => message
+      })*/
     }))
     entityRef
   }
   private val shardActor = init
 
-  final def ask(command: Command): Future[Command#Response] =
-    shardActor.ask((actorRef: ActorRef[Command#Response]) =>
-      ShardingEnvelope.apply(
-        entityId = command.id,
-        message = Message(command, actorRef)
-      )
-    )
+  import akka.actor.typed.scaladsl.AskPattern._
+  def ask[Res](id: String)(replyTo: ActorRef[Res] => Command) =
+    shardActor.ask[Res](replyTo.andThen(command => ShardingEnvelope(id, command)))
 
-}
-
-object ShardedActor {
-  case class Message[Command, Response](command: Command, ref: ActorRef[Response])
-
-  trait Aggregate {
-    def id: String
-    type Response
-  }
 }

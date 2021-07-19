@@ -4,7 +4,6 @@ import akka.Done
 import akka.actor.typed.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl._
-import infrastructure.actor.ShardedActor.Aggregate
 import infrastructure.kafka.algebra.{MessageProcessor, MessageProducer}
 import infrastructure.serialization.algebra._
 import org.scalatest.Assertion
@@ -38,48 +37,56 @@ object KafkaMock {
       }
     }
 
-    implicit def toMock[Command <: Aggregate: ClassTag](
+    /*implicit def toMock[Command: ClassTag, Response: ClassTag](
         implicit
         commandSerialization: Serialization[Command],
-        responseSerialization: Serialization[Command#Response],
+        responseSerialization: Serialization[Response],
         kafkaMockRequirements: KafkaMockRequirements,
         system: ActorSystem[_]
-    ) = new KafkaMock[Command]()
-  }
-}
-class KafkaMock[Command <: Aggregate: ClassTag](
-    )(
-    implicit
-    kafkaMockRequirements: KafkaMockRequirements,
-    s: Serialization[Command],
-    ss: Serialization[Command#Response],
-    system: ActorSystem[Nothing]
-) extends MessageProducer[Command]
-    with MessageProcessor[Command] {
+    ) = new KafkaMock[Command, Response]()*/
 
-  override def producer(topic: String): SourceQueue[Command#Response] =
-    Source
-      .queue(bufferSize = 1024, OverflowStrategy.backpressure)
-      .to(
-        Flow[Command#Response]
-          .map(ss.serialize(_))
-          .to(Sink.foreach {
-            kafkaMockRequirements.onMessage(topic)
-          })
-      )
-      .run
+    implicit def toMockProducer[Response](
+        implicit
+        responseSerialization: Serialization[Response],
+        kafkaMockRequirements: KafkaMockRequirements,
+        system: ActorSystem[_]
+    ) = new MessageProducer[Response] {
 
-  override def run(topic: String, group: String)(
-      callback: Command => Future[Either[String, Unit]]
-  ): (Option[UniqueKillSwitch], Future[Done]) = {
-    kafkaMockRequirements.receiveMessagesFrom(KafkaMock.SubscribeTo(topic, { message: String =>
-      s deserialize message match {
-        case Left(value) => Future.successful(Left(value.explanation))
-        case Right(value) => callback(value)
+      override def producer(topic: String): SourceQueue[Response] =
+        Source
+          .queue(bufferSize = 1024, OverflowStrategy.backpressure)
+          .to(
+            Flow[Response]
+              .map(responseSerialization.serialize(_))
+              .to(Sink.foreach {
+                kafkaMockRequirements.onMessage(topic)
+              })
+          )
+          .run
+    }
+
+    implicit def toMockConsumer[Command](
+        implicit
+        commandSerialization: Serialization[Command],
+        kafkaMockRequirements: KafkaMockRequirements,
+        system: ActorSystem[_]
+    ) = new MessageProcessor[Command] {
+      def run(topic: String, group: String)(
+          callback: Command => Future[Either[String, Unit]]
+      ): (Option[UniqueKillSwitch], Future[Done]) = {
+        kafkaMockRequirements.receiveMessagesFrom(
+          KafkaMock.SubscribeTo(
+            topic, { message: String =>
+              commandSerialization deserialize message match {
+                case Left(value) => Future.successful(Left(value.explanation))
+                case Right(value) => callback(value)
+              }
+              ()
+            }
+          )
+        )
+        (None, Future.successful(Done))
       }
-      ()
-    }))
-    (None, Future.successful(Done))
+    }
   }
-
 }

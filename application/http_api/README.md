@@ -11,7 +11,7 @@ This module is in charge of exposing creation of commands to Kafka via HTTP POST
 
 ```
 Kafka topics published to websocket 1.0.0
-Usage: Kafka Topic as Websocket [options]
+Usage: Kafka infrastructure.microservice.Topic as Websocket [options]
 
   --kafka <value>        URL of Kafka: By default: 0.0.0.0:29092
   --host <value>         Host of the websocket
