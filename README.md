@@ -1,4 +1,4 @@
-# workshop-akka-actors
+![](https://github.com/miguelemosreverte/reactive_architecture/blob/main/images/REACTIVE%20ARCHITECTURE.gif)
 [![](https://jitpack.io/v/miguelemosreverte/reactive_architecture.svg)](https://jitpack.io/#miguelemosreverte/reactive_architecture)
 
 ## TODO WIP
