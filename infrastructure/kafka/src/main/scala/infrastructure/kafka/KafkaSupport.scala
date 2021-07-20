@@ -1,9 +1,10 @@
 package infrastructure.kafka
 
-import infrastructure.serialization.algebra.{Deserializer, Serialization, Serializer}
-import infrastructure.kafka.KafkaSupport.Protocol._
+import infrastructure.kafka.KafkaSupport.Protocol.KafkaRequirements
 import infrastructure.kafka.consumer.{CommitableSource, PlainSource, TransactionalSource}
+import infrastructure.kafka.consumer.logger.Logger
 import infrastructure.kafka.producer.TransactionalProducer
+import infrastructure.serialization.algebra.{Deserializer, Serialization, Serializer}
 
 trait KafkaSupport[A] {
   implicit val deserializer: Deserializer[A]
@@ -25,7 +26,6 @@ object KafkaSupport {
 
   object Protocol {
     import akka.actor.ActorSystem
-    import infrastructure.kafka.consumer.logger.Logger
 
     case class KafkaRequirements(
         kafkaBootstrapServer: KafkaBootstrapServer,

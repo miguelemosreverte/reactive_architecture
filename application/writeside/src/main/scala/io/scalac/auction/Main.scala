@@ -11,11 +11,18 @@ import akka.stream.{OverflowStrategy, UniqueKillSwitch}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import domain.Bid
-import infrastructure.kafka.KafkaSupport.Protocol.{KafkaBootstrapServer, KafkaRequirements}
-import infrastructure.kafka.consumer.TransactionalSource
-import infrastructure.kafka.producer.TransactionalProducer
-import infrastructure.serialization.algebra.{Deserializer, Serializer}
+import infrastructure.actor.ShardedActor
+import infrastructure.http.Client.GET
+import infrastructure.kafka.KafkaSupport.Protocol.KafkaRequirements
+import infrastructure.microservice.TransactionMicroservice
+import infrastructure.serialization.algebra.{Deserializer, Serialization, Serializer}
 import infrastructure.serialization.interpreter.`JSON Serialization`
+import infrastructure.tracing.detection.stoppages.DetectionOfUnconfirmedMessages
+import infrastructure.transaction.Transaction
+import infrastructure.transaction.Transaction.FromTo
+import infrastructure.transaction.algebra.KafkaTransaction
+import infrastructure.transaction.interpreter.`object`.ObjectTransaction
+import infrastructure.transaction.interpreter.free.FreeTransaction
 import io.scalac.auction.auction.Domain.AuctionId
 import io.scalac.auction.auction.Protocol.Commands
 import io.scalac.auction.auction.actor.{Actor => AuctionActor}
@@ -25,115 +32,103 @@ import io.scalac.auction.lot.Domain.{Lot, LotId}
 import io.scalac.auction.lot.{Protocol => LotProtocol}
 import play.api.libs.json.{Format, Json}
 
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-object Main /*extends App {
+object Main extends App with TransactionMicroservice {
 
-  implicit lazy val system: ActorSystem = ActorSystem(
-    "auctionspec",
-    ConfigFactory.parseString("""
-                                |
-                                |akka {
-                                |  actor {
-                                |    provider = cluster
-                                |    debug {
-                                |      receive = on
-                                |    }
-                                |  }
-                                |
-                                |  remote {
-                                |    artery {
-                                |      transport = tcp # See Selecting a transport below
-                                |      canonical.hostname = "0.0.0.0"
-                                |      canonical.port = 2552
-                                |    }
-                                |  }
-                                |
-                                |  cluster {
-                                |    seed-nodes = ["akka://auctionspec@0.0.0.0:2552"]
-                                |  }
-                                |
-                                |  extensions = ["akka.cluster.pubsub.DistributedPubSub"]
-                                |
-                                |
-                                |}
-                                |""".stripMargin)
-  )
+  val name = "Writeside"
 
-  import akka.actor.typed.scaladsl.AskPattern._
-  import akka.actor.typed.scaladsl.adapter._
-  import infrastructure.kafka.KafkaSupport.Implicit._
-
-  implicit lazy val typedSystem = system.toTyped
-  implicit val ec = system.dispatcher
-  implicit val timeout: Timeout = 20.seconds
   implicit val serializer = domain.Bid
-  implicit val kafkaRequirements =
-    KafkaRequirements(KafkaBootstrapServer("0.0.0.0:29092"), system, println, startFromZero = true)
 
-  implicit lazy val sharding = ClusterSharding.apply(system.toTyped)
-
-  case class CreateAuction(id: String, lots: Set[Lot] = Set.empty) extends Aggregate {
-    override type Response = CreatedAuction
-  }
+  case class CreateAuction_(payload: CreateAuction, ref: ActorRef[CreatedAuction])
+  case class CreateAuction(id: String, lots: Set[Lot] = Set.empty)
   implicit object CreateAuction extends `JSON Serialization`[CreateAuction] {
     val example = CreateAuction("Old Egypt Treasure")
     val json: Format[CreateAuction] = Json.format
   }
 
-  case class CreatedAuction(id: String, lots: Set[Lot] = Set.empty) extends Aggregate {
-    override type Response = CreatedAuctionValidated
-  }
+  case class CreatedAuction_(payload: CreatedAuction, ref: ActorRef[CreatedAuctionValidated])
+  case class CreatedAuction(id: String, lots: Set[Lot] = Set.empty)
   implicit object CreatedAuction extends `JSON Serialization`[CreatedAuction] {
     val example = CreatedAuction("Old Egypt Treasure")
     val json: Format[CreatedAuction] = Json.format
   }
 
-  case class CreatedAuctionValidated(id: String, rejected: Boolean, reason: Option[String] = None) extends Aggregate {
-    override type Response = CreatedAuction
-  }
+  case class CreatedAuctionValidated_(payload: CreatedAuctionValidated, ref: ActorRef[akka.Done])
+  case class CreatedAuctionValidated(id: String, rejected: Boolean, reason: Option[String] = None)
   implicit object CreatedAuctionValidated extends `JSON Serialization`[CreatedAuctionValidated] {
     val example = CreatedAuctionValidated("Old Egypt Treasure", rejected = false)
     val json: Format[CreatedAuctionValidated] = Json.format
   }
 
-  implicit object AuctionActor extends ShardedActor[CreateAuction] {
-    override def behavior(id: String): `Command to Event` =
-      Behaviors.receiveMessage { msg: Message[CreateAuction, CreateAuction#Response] =>
-        msg.ref ! CreatedAuction(msg.command.id, msg.command.lots)
+  implicit object AuctionActor extends ShardedActor[CreateAuction_, Int] {
+    override def behavior(id: String)(state: Option[Int] = None): Behavior[CreateAuction_] =
+      Behaviors.receiveMessage { msg: CreateAuction_ =>
+        msg.ref ! CreatedAuction(msg.payload.id, msg.payload.lots)
         Behaviors.same
       }
   }
 
-  implicit object LotActor extends ShardedActor[CreatedAuction] {
+  implicit object LotActor extends ShardedActor[CreatedAuction_, Int] {
 
-    def notAuctioned(id: String): `Command to Event` =
-      Behaviors.receiveMessage { msg: Message[CreatedAuction, CreatedAuction#Response] =>
-        msg.ref ! CreatedAuctionValidated(msg.command.id, rejected = false)
-        auctioned(id)
+    def notAuctioned(id: String)(state: Option[Int] = None): Behavior[CreatedAuction_] =
+      Behaviors.receiveMessage { msg: CreatedAuction_ =>
+        msg.ref ! CreatedAuctionValidated(msg.payload.id, rejected = false)
+        auctioned(id)(state)
       }
 
-    def auctioned(id: String): `Command to Event` =
-      Behaviors.receiveMessage { msg: Message[CreatedAuction, CreatedAuction#Response] =>
+    def auctioned(id: String)(state: Option[Int] = None): Behavior[CreatedAuction_] =
+      Behaviors.receiveMessage { msg: CreatedAuction_ =>
         msg.ref ! CreatedAuctionValidated(
-          msg.command.id,
+          msg.payload.id,
           true,
           Some(s"The lot ${id} had already been auctioned before.")
         )
         Behaviors.same
       }
 
-    override def behavior(id: String): `Command to Event` =
-      notAuctioned(id)
+    override def behavior(id: String)(state: Option[Int] = None): Behavior[CreatedAuction_] =
+      notAuctioned(id)()
   }
 
   println(CreateAuction.serialize(CreateAuction.example))
 
-  import ActorTransactionDTO.Implicits.KafkaTransaction._
+  lazy val transactions: Set[Transaction] = {
+    `with transactionRequirements` { implicit transactionRequirements =>
+      import transactionRequirements.Implicits._
+      implicit val executionContext = transactionRequirements.executionContext
 
-  ActorTransactionDTO[CreateAuction](AuctionActor, "CreateAuction", "CreatedAuction").run
-  ActorTransactionDTO[CreatedAuction](LotActor, "CreatedAuction", "CreatedAuctionValidated").run
+      implicit val `CreateAuction domainToCommand`: (CreateAuction, ActorRef[CreatedAuction]) => CreateAuction_ =
+        CreateAuction_.apply
+      implicit val `CreateAuction  domainEntityIdExtractor`: CreateAuction => String = _.id
 
+      implicit val `CreatedAuction domainToCommand`
+          : (CreatedAuction, ActorRef[CreatedAuctionValidated]) => CreatedAuction_ =
+        CreatedAuction_.apply
+      implicit val `CreatedAuction  domainEntityIdExtractor`: CreatedAuction => String = _.id
+
+      Set(
+        Transaction(
+          microserviceName = name,
+          consumerGroup = "writeside",
+          nodeIdentification = "1",
+          transactionName = "CreateAuction",
+          ObjectTransaction(AuctionActor, "CreateAuction", "CreatedAuction"),
+          executionContext
+        ),
+        Transaction(
+          microserviceName = name,
+          consumerGroup = "writeside",
+          nodeIdentification = "1",
+          transactionName = "CreatedAuction",
+          ObjectTransaction(LotActor, "CreatedAuction", "CreatedAuctionValidated"),
+          executionContext
+        )
+      )
+    }
+  }
+
+  serve
 }
- */

@@ -1,3 +1,5 @@
+package infrastructure.microservice
+
 import infrastructure.http.Client.GET
 import infrastructure.microservice.TransactionMicroservice
 import infrastructure.microservice.cake.withHttpClient
@@ -29,7 +31,7 @@ object Main extends App with TransactionMicroservice with withHttpClient {
 
       implicit val `FromTo deserializer`: Serialization[FromTo] = infrastructure.transaction.Transaction.FromTo
 
-      lazy val done = httpClient.GET[FromTo]("0.0.0.0:8081/transactions", None)
+      //lazy val done = GET.apply[FromTo]("0.0.0.0:8081/topics").response
 
       Seq(
         ("bid", "bidded"),

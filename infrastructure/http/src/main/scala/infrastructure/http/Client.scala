@@ -3,10 +3,18 @@ package infrastructure.http
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials}
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpHeader, HttpRequest, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{
+  ContentType,
+  ContentTypes,
+  HttpHeader,
+  HttpRequest,
+  HttpResponse,
+  StatusCode,
+  StatusCodes
+}
 import akka.util.ByteString
 import cats.data.EitherT
-import infrastructure.http.Client.{`http request with body`, `http request without body`, `http request`, RequestError}
+import infrastructure.http.Client.{DeserializationRequestError, HTTP_Request, RequestError, RequestFailed}
 import infrastructure.serialization.algebra.Deserializer.`failed to deserialize`
 import infrastructure.serialization.algebra.{Deserializer, Serialization, Serializer}
 
@@ -14,70 +22,20 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Either
 
 object Client {
-  type RequestError = Either[`failed to deserialize`, (akka.http.scaladsl.model.StatusCode, String)]
+  sealed trait RequestError
+  case class DeserializationRequestError(error: `failed to deserialize`) extends RequestError
+  case class RequestFailed(error: StatusCode, response: String) extends RequestError
 
-  sealed trait `http request`[Response] {
+  sealed trait HTTP_Request {
     val url: String
     val header: Option[HttpHeader]
-  }
-  sealed trait `http request without body`[Response] extends `http request`[Response] {
-    val url: String
-    val header: Option[HttpHeader]
-  }
-  sealed trait `http request with body`[Body, Response] extends `http request`[Response] {
-    val url: String
-    val body: Body
     val contentType: ContentType.WithFixedCharset = ContentTypes.`application/json`
-    val header: Option[HttpHeader]
   }
-  case class GET[Response](url: String, header: Option[HttpHeader] = None)(
-      implicit
-      responseDeserializer: Deserializer[Response]
-  ) extends `http request without body`[Response]
-  case class POST[Body, Response](url: String, body: Body, header: Option[HttpHeader] = None)(
-      implicit
-      bodySerializer: Serializer[Body],
-      responseDeserializer: Deserializer[Response]
-  ) extends `http request with body`[Body, Response]
-  case class PUT[Body, Response](url: String, body: Body, header: Option[HttpHeader] = None)(
-      implicit
-      bodySerializer: Serializer[Body],
-      responseDeserializer: Deserializer[Response]
-  ) extends `http request with body`[Body, Response]
-  case class DELETE[Response](url: String, header: Option[HttpHeader] = None)(
-      implicit
-      bodySerializer: Serializer[_],
-      responseDeserializer: Deserializer[_]
-  ) extends `http request without body`[Response]
+  case class GET(url: String, header: Option[HttpHeader] = None) extends HTTP_Request
+  case class POST[Body](url: String, body: Body, header: Option[HttpHeader] = None) extends HTTP_Request
+  case class PUT[Body](url: String, body: Body, header: Option[HttpHeader] = None) extends HTTP_Request
+  case class DELETE(url: String, header: Option[HttpHeader] = None) extends HTTP_Request
 
-  object Implicits {
-    implicit class `http request without body sintactic sugar`[Response](
-        request: `http request without body`[Response]
-    ) {
-      def response(
-          implicit
-          serialization: Serialization[Response],
-          httpClient: Client
-      ): EitherT[Future, RequestError, Response] = request match {
-        case req: GET[Response] => httpClient.GET(req)
-        case req: DELETE[Response] => httpClient.DELETE(req)
-      }
-    }
-
-    implicit class `http request with body sintactic sugar`[Body, Response](
-        request: `http request with body`[Body, Response]
-    ) {
-      def response(
-          implicit
-          deserialization: Serialization[Body],
-          serialization: Serialization[Response],
-          httpClient: Client
-      ): EitherT[Future, RequestError, Response] = request match {
-        case req: POST[Body, Response] => httpClient.POST(req)
-        case req: PUT[Body, Response] => httpClient.PUT(req)
-      }
-    }
-  }
 }
 class Client()(
     implicit
@@ -86,89 +44,114 @@ class Client()(
     basicHttpCredentials: Option[BasicHttpCredentials] = None
 ) {
 
-  private final def GET[Response](hTTP_Request: `http request without body`[Response])(
-      implicit
-      outS: Serialization[Response]
-  ): EitherT[Future, RequestError, Response] =
-    http[Response](hTTP_Request, identity)
+  final def `GET bytes`(
+      url: String,
+      headers: Option[HttpHeader]
+  ): EitherT[Future, RequestError, ByteString] =
+    EitherT(http(Client.GET(url, headers), identity))
 
-  private final def POST[Body, Response](hTTP_Request: `http request with body`[Body, Response])(
-      implicit
-      inS: Serialization[Body],
-      outS: Serialization[Response]
-  ): EitherT[Future, RequestError, Response] =
-    http[Response](hTTP_Request, {
-      _.withEntity(hTTP_Request.contentType, {
-        val serialized = inS serialize hTTP_Request.body
-        println("HTTP POST")
-        println(serialized)
-        serialized
-      })
-    })
-
-  private final def PUT[Body, Response](hTTP_Request: `http request with body`[Body, Response])(
-      implicit
-      inS: Serialization[Body],
-      outS: Serialization[Response]
-  ): EitherT[Future, RequestError, Response] =
-    http[Response](hTTP_Request, { _.withEntity(hTTP_Request.contentType, inS serialize hTTP_Request.body) })
-
-  private final def DELETE[Response](hTTP_Request: `http request without body`[Response])(
-      implicit
-      outS: Serialization[Response]
-  ): EitherT[Future, RequestError, Response] =
-    http[Response](hTTP_Request, identity)
-
-  private final def http[Response](
-      hTTP_Request: `http request`[Response],
-      addBody: HttpRequest => HttpRequest
+  final def GET[Response](
+      url: String,
+      headers: Option[HttpHeader]
   )(
       implicit
+      outS: Deserializer[Response]
+  ): EitherT[Future, RequestError, Response] =
+    deserialize[Response](http(Client.GET(url, headers), identity))
+
+  final def POST[Body, Response](
+      url: String,
+      body: Body,
+      headers: Option[HttpHeader]
+  )(
+      implicit
+      inS: Serialization[Body],
       outS: Serialization[Response]
   ): EitherT[Future, RequestError, Response] = {
-    EitherT(
-      for {
-        response: HttpResponse <- Http().singleRequest {
-          val requestBuilder: HttpRequest = (hTTP_Request match {
-            case _: infrastructure.http.Client.GET[_] =>
-              akka.http.scaladsl.client.RequestBuilding.Get
-            case _: infrastructure.http.Client.POST[_, _] =>
-              akka.http.scaladsl.client.RequestBuilding.Post
-            case _: infrastructure.http.Client.PUT[_, _] =>
-              akka.http.scaladsl.client.RequestBuilding.Put
-            case _: infrastructure.http.Client.DELETE[_] =>
-              akka.http.scaladsl.client.RequestBuilding.Delete
-          }).apply(hTTP_Request.url)
-
-          hTTP_Request.header match {
-            case Some(header) =>
-              addBody(requestBuilder).withHeaders(header)
-            case None =>
-              addBody(requestBuilder)
-          }
-
-        }
-        code = response.status
-        entity: String <- `download HTTP entity`(response)
-      } yield {
-        code match {
-          case akka.http.scaladsl.model.StatusCodes.OK =>
-            outS deserialize entity match {
-              case Left(value: Deserializer.`failed to deserialize`) =>
-                Left(Left(value))
-              case Right(value: Response) =>
-                Right(value)
-            }
-          case error: akka.http.scaladsl.model.StatusCode =>
-            Left(Right(error, entity))
-        }
-      }
-    )
+    val request = Client.POST(url, body, headers)
+    deserialize[Response](http(request, {
+      _.withEntity(request.contentType, {
+        inS serialize request.body
+      })
+    }))
   }
 
-  private def `download HTTP entity`(httpResponse: HttpResponse): Future[String] =
-    httpResponse.entity.dataBytes
-      .runFold(ByteString(""))(_ ++ _)
-      .map(_.utf8String)
+  final def PUT[Body, Response](
+      url: String,
+      body: Body,
+      headers: Option[HttpHeader]
+  )(
+      implicit
+      inS: Serialization[Body],
+      outS: Serialization[Response]
+  ): EitherT[Future, RequestError, Response] = {
+    val request = Client.PUT(url, body, headers)
+    deserialize[Response](http(request, {
+      _.withEntity(request.contentType, {
+        inS serialize request.body
+      })
+    }))
+  }
 
+  final def DELETE[Response](
+      url: String,
+      headers: Option[HttpHeader]
+  )(
+      implicit
+      outS: Deserializer[Response]
+  ): EitherT[Future, RequestError, Response] =
+    deserialize[Response](http(Client.DELETE(url, headers), identity))
+
+  private final def http(
+      hTTP_Request: HTTP_Request,
+      addBody: HttpRequest => HttpRequest
+  ): Future[Either[RequestFailed, ByteString]] =
+    for {
+      response: HttpResponse <- Http().singleRequest {
+        val requestBuilder: HttpRequest = (hTTP_Request match {
+          case _: infrastructure.http.Client.GET =>
+            akka.http.scaladsl.client.RequestBuilding.Get
+          case _: infrastructure.http.Client.POST[_] =>
+            akka.http.scaladsl.client.RequestBuilding.Post
+          case _: infrastructure.http.Client.PUT[_] =>
+            akka.http.scaladsl.client.RequestBuilding.Put
+          case _: infrastructure.http.Client.DELETE =>
+            akka.http.scaladsl.client.RequestBuilding.Delete
+        }).apply(hTTP_Request.url)
+
+        hTTP_Request.header match {
+          case Some(header) =>
+            addBody(requestBuilder).withHeaders(header)
+          case None =>
+            addBody(requestBuilder)
+        }
+
+      }
+      code = response.status
+      entity: ByteString <- response.entity.dataBytes
+        .runFold(ByteString(""))(_ ++ _)
+    } yield {
+      code match {
+        case akka.http.scaladsl.model.StatusCodes.OK =>
+          Right(entity)
+        case error: akka.http.scaladsl.model.StatusCode =>
+          Left(RequestFailed(error, entity.utf8String))
+      }
+    }
+
+  private final def deserialize[Response](done: Future[Either[RequestFailed, ByteString]])(
+      implicit
+      outS: Deserializer[Response]
+  ): EitherT[Future, RequestError, Response] =
+    EitherT(
+      done
+        .map {
+          case Right(success) =>
+            (outS deserialize success.utf8String) match {
+              case Left(deserializationError) => Left(DeserializationRequestError(deserializationError))
+              case Right(response) => Right(response)
+            }
+          case Left(requestFailed) => Left(requestFailed)
+        }
+    )
 }

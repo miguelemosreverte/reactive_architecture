@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, decodeRequest, entity, path, post}
 import akka.http.scaladsl.server.Route
 import infrastructure.kafka.http.helper.KafkaWriter
-import infrastructure.serialization.algebra.Deserializer.{DeserializationValidator, `failed to deserialize`}
+import infrastructure.serialization.algebra.Deserializer.{`failed to deserialize`, DeserializationValidator}
 
 import scala.concurrent.{ExecutionContext, Future}
 

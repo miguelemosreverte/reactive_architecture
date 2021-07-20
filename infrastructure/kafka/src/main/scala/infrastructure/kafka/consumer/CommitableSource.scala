@@ -8,11 +8,12 @@ import akka.kafka.{ConsumerMessage, ProducerMessage, Subscriptions}
 import akka.kafka.scaladsl.{Committer, Consumer, Producer}
 import akka.stream.scaladsl.Keep
 import akka.stream.{KillSwitches, UniqueKillSwitch}
-import infrastructure.serialization.algebra.Deserializer
+import infrastructure.kafka.KafkaSupport.Protocol.KafkaRequirements
 import infrastructure.kafka.consumer.logger.Protocol
-import infrastructure.kafka.consumer.logger.Protocol.{`Failed to deserialize`, `Failed to process`, `Processed`}
+import infrastructure.kafka.consumer.logger.Protocol._
+import infrastructure.serialization.algebra.Deserializer
 import org.apache.kafka.clients.producer.ProducerRecord
-import infrastructure.kafka.KafkaSupport.Protocol._
+
 import scala.concurrent.Future
 
 class CommitableSource[A]()(implicit requirements: KafkaRequirements, deserializer: Deserializer[A])

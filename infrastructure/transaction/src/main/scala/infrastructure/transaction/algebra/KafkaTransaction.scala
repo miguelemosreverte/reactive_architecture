@@ -1,4 +1,4 @@
-package infrastructure.kafka.algebra
+package infrastructure.transaction.algebra
 
 import akka.stream.UniqueKillSwitch
 

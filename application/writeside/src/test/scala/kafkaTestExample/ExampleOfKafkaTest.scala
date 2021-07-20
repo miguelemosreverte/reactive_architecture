@@ -7,17 +7,20 @@ import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import infrastructure.actor.ShardedActor
+import infrastructure.kafka.KafkaMock.Implicits.{withSession, TestSession}
 import infrastructure.kafka.KafkaSupport.Protocol.{KafkaBootstrapServer, KafkaRequirements}
-import infrastructure.kafka.algebra.KafkaTransaction
-import infrastructure.kafka.interpreter.`object`.ObjectTransaction
-import infrastructure.kafka.interpreter.functional.FunctionalTransaction
+import infrastructure.transaction.algebra.KafkaTransaction
+import infrastructure.transaction.interpreter.`object`.ObjectTransaction
+import infrastructure.transaction.interpreter.functional.FunctionalTransaction
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpecLike
+import infrastructure.kafka.KafkaMock.Implicits._
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.language.postfixOps
 
 class ExampleOfKafkaTest extends AnyWordSpecLike with Matchers with Eventually with IntegrationPatience {
   import akka.actor.typed.scaladsl.adapter._
@@ -98,7 +101,6 @@ class ExampleOfKafkaTest extends AnyWordSpecLike with Matchers with Eventually w
   "AuctionActor" should {
 
     "add lot" in {
-      import infrastructure.kafka.KafkaMock.Implicits._
       withSession { implicit testSession: TestSession =>
         val `Kafka Transactions`: Seq[KafkaTransaction] = Seq(
           ObjectTransaction(AuctionActor, "CreateAuction", "CreatedAuction"),

@@ -6,11 +6,11 @@ import akka.kafka.{ConsumerMessage, ProducerMessage, Subscriptions}
 import akka.kafka.scaladsl.Transactional
 import akka.stream.scaladsl.{Keep, Sink}
 import akka.stream.{KillSwitches, UniqueKillSwitch}
-import infrastructure.serialization.algebra.{Deserializer, Serializer}
+import infrastructure.kafka.KafkaSupport.Protocol.KafkaRequirements
 import infrastructure.kafka.consumer.logger.Protocol
 import infrastructure.kafka.consumer.logger.Protocol._
+import infrastructure.serialization.algebra.{Deserializer, Serializer}
 import org.apache.kafka.clients.producer.ProducerRecord
-import infrastructure.kafka.KafkaSupport.Protocol._
 
 import scala.concurrent.{ExecutionContext, Future}
 

@@ -4,9 +4,10 @@ import akka.actor.ActorSystem
 import akka.dispatch.MessageDispatcher
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes.OK
+import akka.http.scaladsl.model.Uri.Path
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.http.scaladsl.server.Directives.{complete, get, path}
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Directive, PathMatcher, Route}
 import akka.stream.scaladsl.Flow
 import com.typesafe.config.{Config, ConfigFactory}
 
@@ -95,42 +96,32 @@ object Server {
       actorSystem: ActorSystem
   ): Unit =
     Server(route, akkaHttpServerConfig.interface, akkaHttpServerConfig.port)
+
 }
 
 trait Server {
+  import Server._
   val interface: String = "0.0.0.0"
   val port: Int = 8080
   val explanation: String
-  val preffix: String
-  protected def selfPath = s"$interface:$port/$preffix"
+  val preffix: Directive[Unit]
+  val preffixString: String
+  protected def selfPath = s"$interface:$port/$preffixString"
   def usefulUrls: Seq[String] = Seq(
     s"$selfPath/examples"
   )
 
-  sealed trait Example
-  case class `GET Example`(path: String, exampleOutput: String) extends Example
-  object `GET Example` extends `JSON Serialization`[`GET Example`] {
-    val example = `GET Example`("/", "OK")
-    val json: Format[`GET Example`] = Json.format
-  }
-  case class `POST Example`(path: String, exampleInput: String, exampleOutput: String) extends Example
-  object `POST Example` extends `JSON Serialization`[`POST Example`] {
-    val example = `POST Example`("/", "", "OK")
-    val json: Format[`POST Example`] = Json.format
-  }
-  object Example
-
-  def examples: Seq[Example] = Seq.empty
+  def examples: Seq[Example]
 
   def routes: Route = {
-    Seq(
+    preffix {
       get {
         path("health") {
           complete {
             HttpResponse(OK, entity = "OK")
           }
         }
-      },
+      } ~
       get {
         path("") {
           complete {
@@ -139,12 +130,12 @@ trait Server {
                |
                | ${explanation}
                |
-               | ${usefulUrls}
+               | ${usefulUrls.mkString("\n")}
                |
                |""".stripMargin
           }
         }
-      },
+      } ~
       get {
         path("examples") {
           complete {
@@ -159,6 +150,7 @@ trait Server {
           }
         }
       }
-    ).reduce(_ ~ _)
+    }
+
   }
 }

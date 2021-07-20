@@ -6,12 +6,10 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.scaladsl.Flow
 import infrastructure.http.Server
 import infrastructure.kafka.KafkaSupport.Protocol.{KafkaBootstrapServer, KafkaRequirements}
+import infrastructure.kafka.websocket.KafkaWebsocket
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.language.postfixOps
-import infrastructure.kafka.KafkaSupport.Implicit._
-import infrastructure.kafka.websocket.KafkaWebsocket
-
 import scala.util.Random
 object Main extends App {
 
@@ -28,6 +26,7 @@ object Main extends App {
   implicit val b = domain.Bid
 
   import akka.http.scaladsl.server.Directives._
+  import infrastructure.kafka.KafkaSupport.Implicit._
   val routes: Flow[HttpRequest, HttpResponse, NotUsed] = {
     get {
       path("ws" / "room" / Segment) { topic =>

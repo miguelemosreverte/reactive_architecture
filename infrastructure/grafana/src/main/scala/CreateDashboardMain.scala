@@ -11,35 +11,33 @@ object CreateDashboardMain extends App {
   implicit val executionContext = actorSystem.dispatcher
   implicit val http = new Client()
 
-  import Client.Implicits._
   import stages.set_api_key.Domain._
 
-  val post: POST[CreateDashboard, CreateDashboardResponse] = POST[CreateDashboard, CreateDashboardResponse](
-    url = "http://localhost:3000/api/dashboards/db",
-    CreateDashboard()
-      .overwrite(true)
-      .withName("Hello from Scala")
-      .addPanel(Panel())
-      .addPanel(Panel())
-      .addPanel(Panel())
-      .addPanel(Panel())
-      .addPanel(Panel())
-      .addPanel(Panel())
-      .addPanel(Panel())
-      .addPanel(Panel())
-      .addPanel(Panel())
-      .addPanel(Panel())
-      .prepare,
-    header = Some(
-      Authorization(
-        OAuth2BearerToken.apply("eyJrIjoiOTRrUUxxOUxGU1laRmlrNHdnakVTdWhvMTJyc3lGTmkiLCJuIjoiaW5zb21uaWEiLCJpZCI6MX0=")
+  for {
+    done <- http.POST[CreateDashboard, CreateDashboardResponse](
+      url = "http://localhost:3000/api/dashboards/db",
+      CreateDashboard()
+        .overwrite(true)
+        .withName("Hello from Scala")
+        .addPanel(Panel())
+        .addPanel(Panel())
+        .addPanel(Panel())
+        .addPanel(Panel())
+        .addPanel(Panel())
+        .addPanel(Panel())
+        .addPanel(Panel())
+        .addPanel(Panel())
+        .addPanel(Panel())
+        .addPanel(Panel())
+        .prepare,
+      headers = Some(
+        Authorization(
+          OAuth2BearerToken.apply(
+            "eyJrIjoiOTRrUUxxOUxGU1laRmlrNHdnakVTdWhvMTJyc3lGTmkiLCJuIjoiaW5zb21uaWEiLCJpZCI6MX0="
+          )
+        )
       )
     )
-  )
-  println("Trying to do it")
-
-  for {
-    done <- post.response.value
   } yield {
     println(done)
   }

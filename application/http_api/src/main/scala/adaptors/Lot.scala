@@ -1,5 +1,4 @@
 package adaptors
-
 import infrastructure.kafka.http.HttpToKafka.TopicToWrite
 
 object Lot {

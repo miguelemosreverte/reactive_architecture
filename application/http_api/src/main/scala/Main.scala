@@ -4,9 +4,9 @@ import akka.dispatch.MessageDispatcher
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import com.typesafe.config.ConfigFactory
-import infrastructure.kafka.http.HttpToKafka
-import infrastructure.kafka.http.HttpToKafka.{KafkaEndpoint, TopicToWrite}
 import akka.http.scaladsl.server.Directives._
+import infrastructure.kafka.http.HttpToKafka
+import infrastructure.kafka.http.HttpToKafka.KafkaEndpoint
 
 object Main extends App {
 

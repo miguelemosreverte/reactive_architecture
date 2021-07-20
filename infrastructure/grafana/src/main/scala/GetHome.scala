@@ -8,21 +8,17 @@ object GetHome extends App {
   implicit val executionContext = actorSystem.dispatcher
   implicit val http = new Client()
 
-  import Client.Implicits._
   import stages.set_api_key.Domain._
 
-  val get: GET[GetApiKeyResponse] = GET[GetApiKeyResponse](
-    url = "http://0.0.0.0:3000/api/dashboards/home",
-    header = Some(
-      Authorization(
-        OAuth2BearerToken.apply("eyJrIjoieUhFSVJOd0IwTnNJQUZLMG40ckkwaVcyb1N5SDBaRkUiLCJuIjoicGVwZSIsImlkIjoxfQ==")
+  for {
+    done <- http.GET[GetApiKeyResponse](
+      url = "http://0.0.0.0:3000/api/dashboards/home",
+      headers = Some(
+        Authorization(
+          OAuth2BearerToken.apply("eyJrIjoieUhFSVJOd0IwTnNJQUZLMG40ckkwaVcyb1N5SDBaRkUiLCJuIjoicGVwZSIsImlkIjoxfQ==")
+        )
       )
     )
-  )
-  println("Trying to do it")
-
-  for {
-    done <- get.response.value
   } yield {
     println(done)
   }

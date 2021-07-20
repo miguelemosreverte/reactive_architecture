@@ -1,4 +1,4 @@
-package infrastructure.kafka.interpreter.`object`
+package infrastructure.transaction.interpreter.`object`
 
 import akka.Done
 import akka.actor.typed.{ActorRef, ActorSystem}
@@ -7,10 +7,12 @@ import akka.stream.scaladsl.{Source, SourceQueue}
 import akka.stream.{OverflowStrategy, QueueCompletionResult, QueueOfferResult, UniqueKillSwitch}
 import infrastructure.actor.ShardedActor
 import infrastructure.kafka.KafkaSupport.Protocol.KafkaRequirements
-import infrastructure.kafka.algebra.{KafkaTransaction, MessageProcessor, MessageProducer}
+import infrastructure.kafka.algebra.{MessageProcessor, MessageProducer}
 import infrastructure.kafka.consumer.TransactionalSource
 import infrastructure.kafka.producer.TransactionalProducer
 import infrastructure.serialization.algebra.{Deserializer, Serializer}
+import infrastructure.transaction.algebra.KafkaTransaction
+
 import scala.concurrent._
 
 case class ObjectTransaction[Domain, Command, Response, ActorState](

@@ -1,11 +1,11 @@
 package infrastructure.kafka.producer.settings
 
 import akka.kafka.{ConsumerSettings, ProducerSettings}
+import infrastructure.kafka.KafkaSupport.Protocol.KafkaRequirements
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 
 import java.time.Duration
-import infrastructure.kafka.KafkaSupport.Protocol._
 
 object Producer {
 

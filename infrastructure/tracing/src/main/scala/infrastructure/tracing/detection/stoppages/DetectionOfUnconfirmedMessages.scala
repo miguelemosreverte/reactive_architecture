@@ -6,10 +6,10 @@ import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import akka.stream.UniqueKillSwitch
 import infrastructure.actor.ShardedActor
 import infrastructure.kafka.KafkaSupport.Protocol.KafkaRequirements
-import infrastructure.kafka.algebra.KafkaTransaction
 import infrastructure.kafka.consumer.TransactionalSource
-import infrastructure.kafka.interpreter.free.FreeTransaction
 import infrastructure.tracing.detection.stoppages.Domain._
+import infrastructure.transaction.algebra.KafkaTransaction
+import infrastructure.transaction.interpreter.free.FreeTransaction
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}

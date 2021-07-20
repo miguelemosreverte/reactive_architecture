@@ -1,7 +1,8 @@
-package infrastructure.kafka.interpreter.functional
+package infrastructure.transaction.interpreter.functional
 
 import akka.stream.{QueueCompletionResult, QueueOfferResult}
-import infrastructure.kafka.algebra.{KafkaTransaction, MessageProcessor, MessageProducer}
+import infrastructure.kafka.algebra.{MessageProcessor, MessageProducer}
+import infrastructure.transaction.algebra.KafkaTransaction
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag

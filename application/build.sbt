@@ -8,12 +8,12 @@ scalaVersion := scalaVer
 
 name := "application"
 
-lazy val `writeside` = project.dependsOn(contract)
+lazy val `writeside` = project
 lazy val `readside` = project
 lazy val `websocket_api` = project
 lazy val `http_api` = project
-lazy val `auditor` = project.dependsOn(writeside, contract)
-lazy val `contract` = project
+lazy val `auditor` = project.dependsOn(writeside)
+lazy val `documentation` = project
 
 lazy val application = project
   .in(file("."))

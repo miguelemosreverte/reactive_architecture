@@ -5,12 +5,12 @@ import akka.actor.ActorSystem
 import akka.kafka.ProducerSettings
 import akka.kafka.scaladsl.Producer
 import akka.stream.scaladsl.{Flow, Sink, Source}
+import infrastructure.kafka.KafkaSupport.Protocol.KafkaRequirements
 import infrastructure.serialization.algebra.{Deserializer, Serializer}
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.StringSerializer
 
 import scala.concurrent.{ExecutionContext, Future}
-import infrastructure.kafka.KafkaSupport.Protocol._
 
 class TransactionalProducer[A]()(implicit requirements: KafkaRequirements, serializer: Serializer[A]) {
 

@@ -2,14 +2,15 @@ package infrastructure.microservice
 
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.OK
+import akka.http.scaladsl.model.Uri.Path
 import akka.http.scaladsl.server.Directives.{get, path, _}
-import akka.http.scaladsl.server.Route
-import infrastructure.http.Server
-import infrastructure.kafka.Transaction
-import infrastructure.kafka.interpreter.`object`.ObjectTransaction.Implicits.KafkaTransaction.KafkaTransactionRequirements
+import akka.http.scaladsl.server.{Directive, Route}
+import infrastructure.http.{`GET Example`, Example, Server}
 import infrastructure.microservice.TransactionMicroservice.{Documentation, Transactions}
 import infrastructure.microservice.cake.{withKafkaRequirements, withMetrics, withSystem}
 import infrastructure.serialization.interpreter.`JSON Serialization`
+import infrastructure.transaction.Transaction
+import infrastructure.transaction.interpreter.`object`.ObjectTransaction.Implicits.KafkaTransaction.KafkaTransactionRequirements
 import play.api.libs.json.{Format, Json}
 
 trait TransactionMicroservice
@@ -34,7 +35,8 @@ trait TransactionMicroservice
       |
       |""".stripMargin
 
-  val preffix: String = ""
+  override val preffix: Directive[Unit] = path("")
+  override val preffixString: String = ""
   override protected def selfPath = s"$interface:$port"
 
   override val usefulUrls: Seq[String] = super.usefulUrls ++ Seq(
@@ -44,11 +46,11 @@ trait TransactionMicroservice
   def getTransactions: String =
     Transactions serialize
     Transactions(
-      transactions.map(_.transactionName).toSeq.map(name => s"${selfPath}/transaction/${name}")
+      transactions.map(_.transactionName).toSeq.map(name => s"$selfPath/transaction/${name}")
     )
 
   override def examples: Seq[Example] = Seq(
-    `GET Example`("transactions", getTransactions)
+    `GET Example`(s"$selfPath/transactions", getTransactions)
   )
 
   override def routes: Route = {

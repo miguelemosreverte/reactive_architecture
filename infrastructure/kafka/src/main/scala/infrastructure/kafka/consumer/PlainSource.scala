@@ -5,9 +5,9 @@ import akka.kafka.Subscriptions
 import akka.kafka.scaladsl.Consumer
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, UniqueKillSwitch}
-import infrastructure.serialization.algebra.Deserializer
+import infrastructure.kafka.KafkaSupport.Protocol.KafkaRequirements
 import infrastructure.kafka.consumer.logger.Protocol
-import infrastructure.kafka.KafkaSupport.Protocol._
+import infrastructure.serialization.algebra.Deserializer
 
 import scala.concurrent.{ExecutionContext, Future}
 

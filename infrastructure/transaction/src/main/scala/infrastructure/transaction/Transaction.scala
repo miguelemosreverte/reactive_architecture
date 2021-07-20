@@ -1,14 +1,16 @@
-package infrastructure.kafka
+package infrastructure.transaction
 
 import akka.actor.ActorSystem
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.Behaviors
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Directive, PathMatcher, Route}
 import akka.stream.UniqueKillSwitch
-import infrastructure.kafka.algebra.KafkaTransaction
 import akka.http.scaladsl.server.Directives._
-import infrastructure.kafka.Transaction.{Documentation, FromTo, UsefulUrls}
+import Transaction._
+import akka.http.scaladsl.model.Uri.Path
+import infrastructure.http.{`GET Example`, Example, Server}
 import infrastructure.serialization.interpreter.`JSON Serialization`
+import infrastructure.transaction.algebra.KafkaTransaction
 import play.api.libs.json.{Format, Json}
 import stages.`RED Dashboard`
 
@@ -24,7 +26,7 @@ case class Transaction(
 )(
     implicit
     actorSystem: ActorSystem
-) {
+) extends Server {
 
   private sealed trait Protocol
 
@@ -69,76 +71,85 @@ case class Transaction(
   import stages.add_dashboards._
   import stages.add_dashboards.Implicits._
 
-  // format: off
-    
-    val grafanaRED = `RED Dashboard`(microserviceName, kafkaTransaction.from).asJson
-    /* TODO
+  override def examples: Seq[Example] = Seq(
+    `GET Example`(s"$selfPath/stop", "OK"),
+    `GET Example`(s"$selfPath/start", "OK"),
+    `GET Example`(s"$selfPath/grafana", grafanaRED),
+    `GET Example`(s"$selfPath/documentation", documentation)
+  )
+  val documentation = Documentation serialize
+    Documentation(Documentation.example.explanation,
+                  FromTo(
+                    from = kafkaTransaction.from,
+                    to = kafkaTransaction.to
+                  ))
+  val grafanaRED = `RED Dashboard`(microserviceName, kafkaTransaction.from).asJson
+  /* TODO
      make all Consumers and Producers have a name, aside from the topic,
      because you never know when someone is going to consume a topic two different times.
      the name, which is more of an ID, should be: s"${topic}-${consumerGroup}-${nodeId}"
    */
-    lazy val routes: Route = get {
 
-      path("") {
-        complete {
-          UsefulUrls serialize
-            UsefulUrls(
-              Seq.empty
-            )
+  override def usefulUrls: Seq[String] = Seq(
+    s"$selfPath/start",
+    s"$selfPath/stop",
+    s"$selfPath/grafana",
+    s"$selfPath/documentation"
+  )
+
+  override val preffix: Directive[Unit] = pathPrefix("transactions" / transactionName)
+  override val preffixString: String = s"transactions/$transactionName"
+  override def routes: Route =
+    super.routes ~
+    preffix {
+      get {
+        path("documentation") {
+          complete {
+            documentation
+          }
         }
-      }
-    } ~
-      get { path("transaction" / transactionName / "documentation") {
-        complete {
-          Documentation serialize
-          Documentation(Documentation.example.explanation,
-          FromTo(
-            from = kafkaTransaction.from,
-            to = kafkaTransaction.to
-          )
-          )
+      } ~ get {
+        path("grafana") {
+          complete {
+            grafanaRED
+          }
         }
-      }
-    } ~  get {
-      path("transaction" / transactionName / "grafana") {
-        complete {
-          grafanaRED
-        }
-      }
-    } ~ get {
-        path("transaction" / transactionName / "start") {
+      } ~ get {
+        path("start") {
           complete {
             start
             "OK"
           }
         }
       } ~ get {
-        path("transaction" / transactionName / "stop") {
+        path("stop") {
           complete {
             start
             "OK"
           }
         }
-      }
-  }
 
-object Transaction{
+      }
+    }
+
+  override val explanation: String =
+    """
+      |
+      |This is the component in charge of making Transactions:
+      |
+      |It reads from Kafka topics, processes, and outputs to Kafka, with exactly-once delivery guarantees.
+      |
+      |""".stripMargin
+}
+
+object Transaction {
 
   import infrastructure.serialization.interpreter.`JSON Serialization`
   import play.api.libs.json.{Format, Json}
 
-  case class UsefulUrls(
-                         useful_urls: Seq[String]
-                       )
-
-  object UsefulUrls extends `JSON Serialization`[UsefulUrls] {
-    val example = UsefulUrls( Seq.empty)
-    val json: Format[UsefulUrls] = Json.format
-  }
-
   case class Help(
-                         help: String
-                       )
+      help: String
+  )
 
   object Help extends `JSON Serialization`[Help] {
     val example = Help("")
@@ -150,7 +161,7 @@ object Transaction{
       fromTo: FromTo
   )
   object Documentation extends `JSON Serialization`[Documentation] {
-    val example = Documentation( "no explanation.", FromTo("topic A", "topic B"))
+    val example = Documentation("no explanation.", FromTo("topic A", "topic B"))
     val json: Format[Documentation] = Json.format
   }
   case class FromTo(from: String, to: String)
