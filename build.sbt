@@ -6,9 +6,11 @@ scalaVersion := "2.13.6"
 
 resolvers += "jitpack" at "https://jitpack.io"
 
-libraryDependencies += "com.github.miguelemosreverte.reactive_architecture" % "serialization_2.13" % "main-130eed0b78-1" % "compile->compile;test->test"
-libraryDependencies += "com.github.miguelemosreverte.reactive_architecture" % "actor_2.13" % "main-130eed0b78-1" % "compile->compile;test->test"
-libraryDependencies += "com.github.miguelemosreverte.reactive_architecture" % "kafka_2.13" % "main-130eed0b78-1" % "compile->compile;test->test"
+libraryDependencies += "com.github.miguelemosreverte.reactive_architecture" %% "serialization" % "97af90470e" % "compile->compile;test->test"
+libraryDependencies += "com.github.miguelemosreverte.reactive_architecture" %% "actor" % "97af90470e" % "compile->compile;test->test"
+libraryDependencies += "com.github.miguelemosreverte.reactive_architecture" %% "kafka" % "97af90470e" % "compile->compile;test->test"
+libraryDependencies += "com.github.miguelemosreverte.reactive_architecture" %% "microservice" % "97af90470e" % "compile->compile;test->test"
+libraryDependencies += "com.github.miguelemosreverte.reactive_architecture" %% "akka-auction-workshop" % "97af90470e" % "compile->compile;test->test"
 
 import sbt.Keys._
 
