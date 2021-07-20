@@ -1,6 +1,9 @@
 ![](https://github.com/miguelemosreverte/reactive_architecture/blob/main/images/REACTIVE%20ARCHITECTURE.gif)
 [![](https://jitpack.io/v/miguelemosreverte/reactive_architecture.svg)](https://jitpack.io/#miguelemosreverte/reactive_architecture)
 
+## Examples of use:
+https://github.com/miguelemosreverte/reactive_architecture/tree/ExampleOfUse
+
 ## TODO WIP
 Make draw.io ofthe proposed architecture
 
